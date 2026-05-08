@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: edu-predict-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: edu_predict
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - edu-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: edu-predict-backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/edu_predict
+      JWT_SECRET: your-secret-key
+      PORT: 5000
+      NODE_ENV: development
+      AI_ENGINE_URL: http://ai-engine:5001
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+    networks:
+      - edu-network
+    volumes:
+      - ./backend/src:/app/src
+
+  ai-engine:
+    build:
+      context: ./ai-engine
+      dockerfile: Dockerfile
+    container_name: edu-predict-ai
+    environment:
+      FLASK_ENV: development
+      FLASK_APP: app.py
+    ports:
+      - "5001:5001"
+    networks:
+      - edu-network
+    volumes:
+      - ./ai-engine:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: edu-predict-frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:5000/api
+    ports:
+      - "3000:3000"
+    networks:
+      - edu-network
+    volumes:
+      - ./frontend/src:/app/src
+
+volumes:
+  postgres_data:
+
+networks:
+  edu-network:
+    driver: bridge
